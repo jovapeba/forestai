@@ -18,6 +18,7 @@ import { fetchRealGauges } from '@/services/api/waterLevelService';
 import { fetchUsgsDailyGages } from '@/services/api/waterdataDevService';
 import { fetchAmedas, type AmedasRow } from '@/services/api/amedasService';
 import { fetchCityAqGrid, type CityAqRow } from '@/services/api/cityAqService';
+import { fetchObisMarine } from '@/services/api/obisService';
 import type {
   FireHotspot,
   FireWeather,
@@ -174,7 +175,8 @@ export function useLiveFeeds(): LiveFeeds {
         try {
           const gbif = await fetchSpeciesObservations(territory);
           const inat = await fetchInatSpeciesObservations(territory);
-          speciesObs = [...gbif, ...inat];
+          const obis = await fetchObisMarine(territory);
+          speciesObs = [...gbif, ...inat, obis];
         } catch {
           /* honest empty — the map shows no records rather than fake ones */
         }

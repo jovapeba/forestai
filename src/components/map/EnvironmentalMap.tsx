@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { MapContainer, Marker, Polyline, Polygon, Popup, TileLayer, Tooltip, Circle, CircleMarker } from 'react-leaflet';
+import { useMemo, useState } from 'react';
+import { MapContainer, Marker, Polyline, Polygon, Popup, TileLayer, Tooltip, Circle, CircleMarker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { getTerritory } from '@/data/territoriesData';
@@ -7,6 +7,7 @@ import { useAppStore, useT } from '@/store/useAppStore';
 import { useLive } from '@/hooks/useLiveFeeds';
 import { gibsDate, gibsTrueColorUrl, gibsAodUrl, NDVI_FILTER_CLASS } from '@/services/api/satelliteService';
 import { euAqiColor } from '@/services/api/cityAqService';
+import { CMEMS_SST, CMEMS_CURRENTS, cmemsTileUrl, fetchCmemsValue, type CmemsLayerDef } from '@/services/api/cmemsService';
 import { cartoDarkBasemapUrl } from '@/services/api/basemap';
 import type { EnvironmentalEvent } from '@/types/environmental';
 import type { RainRadar } from '@/types/environmental';
@@ -119,6 +120,12 @@ export function MapSection() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <SectionHeading kicker="02 · VIRTUAL GRID" title={t('map.title')} sub={t('map.sub')} align="left" />
+          <a
+            href="#global-map"
+            className="mb-1 inline-flex items-center gap-2 rounded-xl border border-moss-400/40 bg-forest-800/70 px-4 py-2.5 font-mono text-[11px] font-semibold uppercase tracking-widest text-moss-300 transition-colors hover:bg-forest-800 hover:text-white"
+          >
+            🌍 Open full-screen global map
+          </a>
         </div>
         <EnvironmentalMap />
       </div>
@@ -128,13 +135,61 @@ export function MapSection() {
 
 /* ------------------------------- the map -------------------------------- */
 
-export function EnvironmentalMap() {
+/** CMEMS ocean value at the clicked point — WMTS GetFeatureInfo (real JSON). */
+function CmemsClickReader() {
+  const layers = useAppStore((s) => s.layers);
+  const [readout, setReadout] = useState<{
+    lat: number;
+    lon: number;
+    entries: { def: CmemsLayerDef; value: number; units: string }[];
+  } | null>(null);
+
+  useMapEvents({
+    async click(e) {
+      const defs: CmemsLayerDef[] = [];
+      if (layers.cmemsSst) defs.push(CMEMS_SST);
+      if (layers.cmemsCur) defs.push(CMEMS_CURRENTS);
+      if (defs.length === 0) return;
+      const entries = (
+        await Promise.all(
+          defs.map(async (def) => {
+            const v = await fetchCmemsValue(e.latlng.lat, e.latlng.lng, def);
+            return v ? { def, value: v.value, units: v.units } : null;
+          }),
+        )
+      ).filter((x): x is { def: CmemsLayerDef; value: number; units: string } => x !== null);
+      if (entries.length > 0) setReadout({ lat: e.latlng.lat, lon: e.latlng.lng, entries });
+    },
+  });
+
+  if (!readout) return null;
+  return (
+    <Popup position={[readout.lat, readout.lon]} autoPan={false}>
+      <div className="font-mono text-[11px]">
+        <p className="font-bold uppercase tracking-wider text-teal-700">Copernicus Marine · forecast</p>
+        {readout.entries.map(({ def, value, units }) => (
+          <p key={def.id}>
+            <b>{def.label}</b>: {Number.isFinite(value) ? value : '—'} {units}
+          </p>
+        ))}
+        <p className="text-[10px] text-slate-500">
+          {readout.lat.toFixed(3)}°, {readout.lon.toFixed(3)}° · live WMTS GetFeatureInfo
+        </p>
+      </div>
+    </Popup>
+  );
+}
+
+export function EnvironmentalMap({ className }: { className?: string }) {
   const t = useT();
   const territoryCode = useAppStore((s) => s.territoryCode);
   const territory = getTerritory(territoryCode);
   const layers = useAppStore((s) => s.layers);
   const opacity = useAppStore((s) => s.satelliteOpacity);
   const live = useLive();
+  // Mobile: the desktop layer panel is hidden on small screens — this sheet
+  // gives touch users the same toggles as a slide-over panel.
+  const [mobileLayers, setMobileLayers] = useState(false);
 
   const points = territory.hydroPoints;
   const riverLine = useMemo<[number, number][]>(
@@ -163,7 +218,7 @@ export function EnvironmentalMap() {
         layers.ndvi ? 'ndvi-on' : ''
       }`}
     >
-      <div className="h-[520px] md:h-[600px]">
+      <div className={className ?? 'h-[70svh] md:h-[600px]'}>
         <MapContainer
           center={territory.mapCenter}
           zoom={territory.zoom}
@@ -238,7 +293,33 @@ export function EnvironmentalMap() {
             />
           )}
 
+          {/* Copernicus Marine (CMEMS) WMTS — real ocean layers (SST / currents),
+              anonymous endpoint, EPSG:3857 WebMercatorQuad = standard XYZ */}
+          {layers.cmemsSst && (
+            <TileLayer
+              key="cmems-sst"
+              url={cmemsTileUrl(CMEMS_SST)}
+              attribution='Ocean analysis &amp; forecast &copy; <a href="https://marine.copernicus.eu/">Copernicus Marine Service</a> (Mercator Ocean)'
+              opacity={CMEMS_SST.opacity}
+              maxNativeZoom={10}
+              maxZoom={19}
+            />
+          )}
+          {layers.cmemsCur && (
+            <TileLayer
+              key="cmems-cur"
+              url={cmemsTileUrl(CMEMS_CURRENTS)}
+              attribution='Ocean currents &copy; <a href="https://marine.copernicus.eu/">Copernicus Marine Service</a>'
+              opacity={CMEMS_CURRENTS.opacity}
+              maxNativeZoom={10}
+              maxZoom={19}
+            />
+          )}
+
           <Recenter center={territory.mapCenter} zoom={territory.zoom} />
+
+          {/* CMEMS point readout: click the ocean → real forecast value */}
+          {(layers.cmemsSst || layers.cmemsCur) && <CmemsClickReader />}
 
           {/* RainViewer precipitation radar — real radar reflectivity (rain + thunderstorm cells) */}
           {layers.rain && live.rainRadar.framePath && (
@@ -355,11 +436,13 @@ export function EnvironmentalMap() {
                   pathOptions={
                     so.dataset === 'LIVE:GBIF'
                       ? { color: '#a3e635', weight: 1.4, fill: true, fillColor: '#1a2e05', fillOpacity: 0.55 }
-                      : { color: '#f472b6', weight: 1.4, fill: true, fillColor: '#500724', fillOpacity: 0.55 }
+                      : so.dataset === 'LIVE:OBIS'
+                        ? { color: '#22d3ee', weight: 1.4, fill: true, fillColor: '#083344', fillOpacity: 0.55 }
+                        : { color: '#f472b6', weight: 1.4, fill: true, fillColor: '#500724', fillOpacity: 0.55 }
                   }
                 >
                   <Tooltip direction="top" offset={[0, -6]}>
-                    <b>REAL {so.dataset === 'LIVE:GBIF' ? 'GBIF' : 'INATURALIST'} RECORD</b> · {o.species}
+                    <b>REAL {so.dataset === 'LIVE:GBIF' ? 'GBIF' : so.dataset === 'LIVE:OBIS' ? 'OBIS (MARINE)' : 'INATURALIST'} RECORD</b> · {o.species}
                     <br />
                     {o.lat.toFixed(3)}°, {o.lon.toFixed(3)}° · {o.date}
                     <br />
@@ -643,29 +726,49 @@ export function EnvironmentalMap() {
         </MapContainer>
       </div>
 
-      {/* Layer control panel */}
+      {/* Layer control panel — desktop */}
       <div className="absolute right-3 top-3 z-[500] hidden md:block">
         <LayerControl />
       </div>
 
-      {/* Legend */}
-      <div className="absolute bottom-3 left-3 z-[500] hidden items-center gap-4 rounded-lg border border-grid bg-forest-950/90 px-3.5 py-2 font-mono text-[9px] uppercase tracking-wider text-slate-400 backdrop-blur md:flex">
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-amber-400" /> FIRMS hotspot (real)</span>
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-teal-400" /> GloFAS point</span>
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rotate-45 border-2 border-cyan-400 bg-cyan-400/20" style={{ width: 7, height: 7 }} /> Official gauge (real)</span>
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full border border-lime-400 bg-lime-400/30" /> GBIF record (real)</span>
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full border border-pink-400 bg-pink-400/30" /> iNaturalist record (real)</span>
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-green-500" /> Protected site</span>
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-red-400" /> Earthquake / warning (real)</span>
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-blue-400" /> EONET event (real)</span>
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-sky-300/70" /> Rain radar (RainViewer)</span>
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-red-300" /> US fire incidents (real)</span>
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 border border-orange-300 bg-orange-300/20" /> Fire perimeters (real)</span>
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-amber-400/60" /> Drought / AQI (US EPA)</span>
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-sky-400" /> JMA AMeDAS stations (real)</span>
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-lime-400" /> CAMS air grid (real)</span>
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-violet-300/70" /> VIIRS aerosols (real)</span>
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-slate-200" /> Esri high-res imagery (real)</span>
+      {/* Layer control — mobile floating button + slide-over sheet */}
+      <button
+        onClick={() => setMobileLayers((o) => !o)}
+        className="absolute right-3 top-3 z-[600] flex items-center gap-2 rounded-xl border border-grid bg-forest-950/90 px-3 py-2 font-mono text-[10px] font-semibold uppercase tracking-widest text-slate-200 shadow-xl backdrop-blur md:hidden"
+        aria-expanded={mobileLayers}
+      >
+        <span className={`h-2 w-2 rounded-full ${mobileLayers ? 'bg-moss-400' : 'bg-slate-500'}`} /> Layers
+      </button>
+      {mobileLayers && (
+        <div className="absolute inset-0 z-[590] bg-black/40 md:hidden" onClick={() => setMobileLayers(false)} />
+      )}
+      {mobileLayers && (
+        <div className="absolute right-2 top-12 z-[600] max-h-[75%] overflow-y-auto thin-scroll rounded-xl shadow-2xl md:hidden">
+          <LayerControl />
+        </div>
+      )}
+
+      {/* Legend — mobile: horizontally scrollable strip; desktop: wrapped row */}
+      <div className="absolute bottom-3 left-3 right-3 z-[500] flex max-w-[calc(100%-1.5rem)] items-center gap-4 overflow-x-auto rounded-lg border border-grid bg-forest-950/90 px-3.5 py-2 font-mono text-[9px] uppercase tracking-wider text-slate-400 backdrop-blur md:left-3 md:right-auto md:max-w-none md:flex-wrap">
+        <span className="flex shrink-0 items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-amber-400" /> FIRMS hotspot (real)</span>
+        <span className="flex shrink-0 items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-teal-400" /> GloFAS point</span>
+        <span className="flex shrink-0 items-center gap-1.5"><span className="h-2 w-2 rotate-45 border-2 border-cyan-400 bg-cyan-400/20" style={{ width: 7, height: 7 }} /> Official gauge (real)</span>
+        <span className="flex shrink-0 items-center gap-1.5"><span className="h-2 w-2 rounded-full border border-lime-400 bg-lime-400/30" /> GBIF record (real)</span>
+        <span className="flex shrink-0 items-center gap-1.5"><span className="h-2 w-2 rounded-full border border-pink-400 bg-pink-400/30" /> iNaturalist record (real)</span>
+        <span className="flex shrink-0 items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-green-500" /> Protected site</span>
+        <span className="flex shrink-0 items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-red-400" /> Earthquake / warning (real)</span>
+        <span className="flex shrink-0 items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-blue-400" /> EONET event (real)</span>
+        <span className="flex shrink-0 items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-sky-300/70" /> Rain radar (RainViewer)</span>
+        <span className="flex shrink-0 items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-red-300" /> US fire incidents (real)</span>
+        <span className="flex shrink-0 items-center gap-1.5"><span className="h-2 w-2 border border-orange-300 bg-orange-300/20" /> Fire perimeters (real)</span>
+        <span className="flex shrink-0 items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-amber-400/60" /> Drought / AQI (US EPA)</span>
+        <span className="flex shrink-0 items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-sky-400" /> JMA AMeDAS stations (real)</span>
+        <span className="flex shrink-0 items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-lime-400" /> CAMS air grid (real)</span>
+        <span className="flex shrink-0 items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-violet-300/70" /> VIIRS aerosols (real)</span>
+        <span className="flex shrink-0 items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-slate-200" /> Esri high-res imagery (real)</span>
+        <span className="flex shrink-0 items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-teal-300" /> CMEMS ocean SST (real)</span>
+        <span className="flex shrink-0 items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-cyan-300" /> CMEMS ocean currents (real)</span>
+        <span className="flex shrink-0 items-center gap-1.5"><span className="h-2 w-2 rounded-full border border-cyan-400 bg-cyan-900/60" /> OBIS marine record (real)</span>
       </div>
 
       {/* HUD corner ticks */}

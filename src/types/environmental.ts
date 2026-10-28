@@ -31,6 +31,7 @@ export type FeedSource =
   | 'LIVE:JMA-JAPAN'
   | 'LIVE:JMA-AMEDAS'
   | 'LIVE:CAMS-AQ-GRID'
+  | 'LIVE:OBIS'
   | 'LIVE:US-FIRE-INCIDENTS'
   | 'LIVE:US-FIRE-PERIMETERS'
   | 'LIVE:US-DROUGHT-MONITOR'
@@ -186,11 +187,11 @@ export interface AirQuality {
   co: number;
 }
 
-/** Species occurrence bundle from one dataset (GBIF or iNaturalist). */
+/** Species occurrence bundle from one dataset (GBIF · iNaturalist · OBIS). */
 export interface SpeciesObservations {
-  species: string;      // latin name
+  species: string;      // latin name (or network-level label for OBIS)
   commonName: string;
-  dataset: 'LIVE:GBIF' | 'LIVE:INATURALIST';
+  dataset: 'LIVE:GBIF' | 'LIVE:INATURALIST' | 'LIVE:OBIS';
   items: Occurrence[];
   source: FeedSource;
 }

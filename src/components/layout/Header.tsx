@@ -117,6 +117,13 @@ export function Header() {
             )}
           </div>
 
+          <a
+            href="#global-map"
+            className="hidden items-center gap-2 rounded-lg border border-moss-400/40 bg-forest-800/70 px-3 py-2 text-[13px] font-semibold text-moss-300 transition-colors hover:border-moss-400/70 hover:text-white sm:flex"
+          >
+            <Globe2 size={14} /> Global Map
+          </a>
+
           <div className="hidden lg:block">
             <LanguageBar />
           </div>
@@ -142,6 +149,13 @@ export function Header() {
       {mobileOpen && (
         <div className="glass-strong border-t border-grid px-4 pb-5 pt-2 xl:hidden">
           <nav className="grid gap-1">
+            <a
+              href="#global-map"
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-2 rounded-lg bg-moss-400/10 px-3 py-2.5 text-sm font-semibold text-moss-300 hover:bg-moss-400/20"
+            >
+              <Globe2 size={15} /> Global Map — full screen
+            </a>
             {NAV.map((n) => (
               <a
                 key={n.href}

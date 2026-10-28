@@ -19,6 +19,8 @@ const LAYER_META: { key: keyof MapLayers; label: string; color: string; icon: Re
   { key: 'aqi', label: 'EPA COUNTY AQI (REAL)', color: '#a78bfa', icon: <Wind size={13} /> },
   { key: 'amedas', label: 'JMA AMEDAS STATIONS (REAL)', color: '#7dd3fc', icon: <Droplets size={13} /> },
   { key: 'aqgrid', label: 'GLOBAL AIR GRID · CAMS (REAL)', color: '#a3e635', icon: <Wind size={13} /> },
+  { key: 'cmemsSst', label: 'CMEMS OCEAN SST (REAL)', color: '#2dd4bf', icon: <Waves size={13} /> },
+  { key: 'cmemsCur', label: 'CMEMS OCEAN CURRENTS (REAL)', color: '#5eead4', icon: <Waves size={13} /> },
   { key: 'aod', label: 'SATELLITE AEROSOLS · VIIRS AOD', color: '#c4b5fd', icon: <Sparkles size={13} /> },
   { key: 'esri', label: 'WORLD IMAGERY · HIGH-RES', color: '#e2e8f0', icon: <Mountain size={13} /> },
   { key: 's2', label: 'SENTINEL-2 CLOUDLESS IMAGERY', color: '#e2e8f0', icon: <Sparkles size={13} /> },

@@ -42,7 +42,8 @@ npx tsx scripts/smoke.ts   # real-feed smoke test (live-or-unavailable assertion
 | IGNIS · FWI | Transparent Nesterov-style derivation from the live weather | `DERIVED:OPEN-METEO` |
 | FLUVIA · global | **Copernicus GloFAS** modelled discharge via `flood-api.open-meteo.com` (7-day ensemble + climatological mean) | `LIVE:GLOFAS` — always labelled *model output, not an observed gauge* |
 | FLUVIA · official gauges | 🇺🇸 **USGS NWIS IV** (`waterservices.usgs.gov`, param 00065) · 🇩🇪 **WSV Pegelonline v2** (`pegelonline.wsv.de`) · 🇬🇧 **UK Environment Agency** (`environment.data.gov.uk`) · 🇫🇷 **Hub'Eau hydrometrie** (`hubeau.eaufrance.fr`, anonymous/CORS-open; some datacenter egress gets 403) · 🇵🇱 **IMGW hydro** (`danepubliczne.imgw.pl`, ~913 stations, CORS-open, real per-station alarm/warning thresholds) · 🇨🇿 **CHMI Open Data** (`opendata.chmi.cz`, 563 stations, 10-min series + official 4-stage danger thresholds) · 🇳🇴 **NVE HydAPI** (`hydapi.nve.no`, free key — `VITE_NVE_API_KEY`) — all verified live | per-gauge `LIVE:*` · territories with no anonymous open network (🇸🇮 ARSO, 🇧🇷 ANA Hidroweb, 🇦🇺 BoM) show `UNAVAILABLE` — no readings are invented |
-| FAUNA | **GBIF** species-match + occurrence search (global backbone) · **iNaturalist** recent georeferenced observations (`api.inaturalist.org`) — both scoped to the territory bbox | `LIVE:GBIF` / `LIVE:INATURALIST` or `UNAVAILABLE` · **no collar telemetry is simulated** |
+| FAUNA | **GBIF** species-match + occurrence search (global backbone) · **iNaturalist** recent georeferenced observations (`api.inaturalist.org`) · **OBIS** marine biodiversity (`api.obis.org` — Ocean Biodiversity Information System, >25 M records from museums/surveys/community datasets, CORS-open, no key) — all scoped to the territory bbox | `LIVE:GBIF` / `LIVE:INATURALIST` / `LIVE:OBIS` or `UNAVAILABLE` · **no collar telemetry is simulated** |
+| Map · ocean (CMEMS) | **Copernicus Marine Service WMTS** (`wmts.marine.copernicus.eu/teroWmts`) — real ocean layers, anonymous, no key needed for visualization: sea-surface temperature (daily global forecast), sea-surface currents (vector style), sea-level anomaly — plus **GetFeatureInfo** click-readouts returning the real forecast value in physical units | tile layers + click popups · verified live incl. today's forecast step |
 | ORBITA | **NASA GIBS** `MODIS_Terra_CorrectedReflectance_TrueColor` WMTS (real daily imagery) | always live imagery |
 | CANOPY | **Open-Meteo** ERA5/CMAAS 4-layer soil moisture (0–1 / 1–3 / 3–9 / 9–27 cm) · **CAMS air quality** — EU AQI + PM2.5/PM10/O₃/NO₂/SO₂/CO (global, no key) · **CAMS city grid** — real EU-AQI/PM at 33 world cities from one batched request (map layer, all views) | `LIVE:OPEN-METEO` / `LIVE:CAMS-AQ-GRID` or `UNAVAILABLE` |
 | Map · satellite AQ | **NASA GIBS VIIRS SNPP Deep Blue AOD** — daily aerosol optical depth (smoke · dust · haze column), global, no key | tile layer, verified live incl. same-day tiles |
@@ -66,6 +67,9 @@ IMGW hydro (PL — 913 stations, CORS-open) · JMA bosai warnings (JP, CORS-open
 JMA AMeDAS observations (JP — 1,286 stations, CORS-open) ·
 Open-Meteo CAMS air-quality city grid (33 cities, one batched request) ·
 NASA GIBS VIIRS Deep Blue AOD (satellite aerosols, CORS-open) ·
+**OBIS marine biodiversity** (`api.obis.org`, CORS-open) ·
+**CMEMS WMTS ocean layers + GetFeatureInfo** (anonymous — a Copernicus Marine
+account is only needed for bulk Toolbox downloads, not for map layers/point values) ·
 SMHI metobs open catalog (SE, no key needed for station obs) · GBIF · iNaturalist.
 
 **Free with registration (wire the key into `.env.local`):**
@@ -123,9 +127,14 @@ so a cold CDN edge or a brief proxy hiccup doesn't strand a feed for the session
 ### Docker deploy (bundled)
 
 The image is a two-stage build: Node compiles the SPA (`tsc --noEmit && vite build`), then
-nginx serves `dist/` **plus the three same-origin feed proxies** (`/firms-csv`, `/meteoalarm`,
-`/hubeau`) — so the no-CORS feeds resolve live in production. Without the proxy paths the app
-still runs and degrades honestly.
+nginx serves `dist/` **plus the same-origin feed proxies** (`/firms-csv`, `/meteoalarm`,
+`/hubeau`, `/chmi`, `/gdacs`) — so the no-CORS feeds resolve live in production. Without the
+proxy paths the app still runs and degrades honestly.
+
+**Routes:** the marketing site lives at `/` (hash anchors `#virtual-grid`, `#modules`, …) and the
+dedicated full-screen map at **`/#global-map`** — worldwide fires, earthquakes, GDACS alerts, the
+CAMS air grid and every official gauge network edge-to-edge (mobile-friendly: floating LAYERS
+sheet + scrollable legend).
 
 ```bash
 # quickest

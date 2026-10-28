@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { useLiveFeeds, LiveFeedsProvider } from '@/hooks/useLiveFeeds';
 import { Header } from '@/components/layout/Header';
@@ -18,6 +18,18 @@ import { BenefitsSection } from '@/components/sections/BenefitsSection';
 import { PilotSection } from '@/components/pilot/PilotSection';
 import { PilotRequestModal } from '@/components/pilot/PilotRequestModal';
 import { PanelErrorBoundary } from '@/components/ui/ErrorBoundary';
+import { GlobalMapPage } from '@/pages/GlobalMapPage';
+
+/** Minimal hash router: `#global-map` renders the dedicated map page. */
+function useHashRoute(): string {
+  const [hash, setHash] = useState(() => window.location.hash);
+  useEffect(() => {
+    const on = () => setHash(window.location.hash);
+    window.addEventListener('hashchange', on);
+    return () => window.removeEventListener('hashchange', on);
+  }, []);
+  return hash;
+}
 
 function Consoles() {
   return (
@@ -43,9 +55,30 @@ function Consoles() {
   );
 }
 
+function MarketingPage() {
+  return (
+    <>
+      <Header />
+      <main>
+        <HeroSection />
+        <TerritoryScanner />
+        <MapSection />
+        <CoreModulesGrid />
+        <Consoles />
+        <CommandSection />
+        <HardwareVsVirtualTable />
+        <BenefitsSection />
+        <PilotSection />
+      </main>
+      <Footer />
+    </>
+  );
+}
+
 export default function App() {
   const lang = useAppStore((s) => s.lang);
   const feeds = useLiveFeeds();
+  const route = useHashRoute();
 
   // RTL support for Arabic; keep Leaflet panes LTR-friendly.
   useEffect(() => {
@@ -55,22 +88,14 @@ export default function App() {
 
   return (
     <LiveFeedsProvider value={feeds}>
-      <div className="relative min-h-screen overflow-x-clip bg-forest-950">
-        <Header />
-        <main>
-          <HeroSection />
-          <TerritoryScanner />
-          <MapSection />
-          <CoreModulesGrid />
-          <Consoles />
-          <CommandSection />
-          <HardwareVsVirtualTable />
-          <BenefitsSection />
-          <PilotSection />
-        </main>
-        <Footer />
-        <PilotRequestModal />
-      </div>
+      {route.startsWith('#global-map') ? (
+        <GlobalMapPage />
+      ) : (
+        <div className="relative min-h-screen overflow-x-clip bg-forest-950">
+          <MarketingPage />
+        </div>
+      )}
+      <PilotRequestModal />
     </LiveFeedsProvider>
   );
 }

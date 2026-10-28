@@ -17,6 +17,8 @@ import { fetchTerritoryEvents } from '../src/services/api/eventsService';
 import { fetchAmedas } from '../src/services/api/amedasService';
 import { fetchCityAqGrid } from '../src/services/api/cityAqService';
 import { fetchFireWeather } from '../src/services/api/openMeteoService';
+import { fetchObisMarine } from '../src/services/api/obisService';
+import { CMEMS_SST, cmemsTileUrl, fetchCmemsValue } from '../src/services/api/cmemsService';
 import { deriveFwi, fwiToCategory } from '../src/services/api/hazard';
 
 let failures = 0;
@@ -196,6 +198,27 @@ for (const code of ['US', 'DE', 'GB', 'SI', 'BR', 'AU', 'PL']) {
     'Czechia MeteoAlarm CAP live',
     czEvents.sources.includes('LIVE:METEOALARM'),
     `${czEvents.items.length} events · ${czEvents.sources.join(',')}`,
+  );
+
+  // OBIS marine biodiversity — coastal territories have real records
+  const obisSi = await fetchObisMarine(getTerritory('SI'));
+  check(
+    'OBIS marine records live (SI coastal window)',
+    obisSi.source === 'LIVE:OBIS',
+    `${obisSi.source} · ${obisSi.items.length} marine records`,
+  );
+
+  // CMEMS ocean — WMTS tile URL well-formed + real GetFeatureInfo value
+  const cmemsUrl = cmemsTileUrl(CMEMS_SST);
+  const cmemsValue = await fetchCmemsValue(43.2, 5.3, CMEMS_SST); // Gulf of Lion
+  check(
+    'CMEMS ocean SST live (tile template + GetFeatureInfo)',
+    cmemsUrl.includes('request=GetTile') &&
+      cmemsUrl.includes('tilematrixset=EPSG%3A3857') &&
+      cmemsValue != null &&
+      Number.isFinite(cmemsValue.value) &&
+      cmemsValue.units.length > 0,
+    `${cmemsValue ? `${cmemsValue.value} ${cmemsValue.units} @ ${cmemsValue.lat.toFixed(1)},${cmemsValue.lon.toFixed(1)}` : 'no value'}`,
   );
 
   // Global CAMS air-quality city grid — one batched request, real EU AQI

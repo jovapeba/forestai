@@ -18,6 +18,8 @@ export interface MapLayers {
   aqi: boolean;
   amedas: boolean;
   aqgrid: boolean;
+  cmemsSst: boolean;
+  cmemsCur: boolean;
   aod: boolean;
   esri: boolean;
   s2: boolean;
@@ -48,7 +50,8 @@ export const useAppStore = create<AppState>((set) => ({
     // fast and clean; users opt into imagery per view.
     satellite: false, ndvi: false, fire: true, water: true, official: true, animal: true,
     forest: true, events: true, rain: false, incidents: true, perimeters: true,
-    drought: true, aqi: true, amedas: true, aqgrid: true, aod: false, esri: true, s2: false, terrain: false,
+    drought: true, aqi: true, amedas: true, aqgrid: true, cmemsSst: false, cmemsCur: false,
+    aod: false, esri: true, s2: false, terrain: false,
   },
   setTerritory: (code) => set({ territoryCode: code }),
   setLang: (lang) => set({ lang }),
