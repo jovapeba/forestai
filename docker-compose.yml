@@ -1,0 +1,20 @@
+# VERDANT AI — one-command deploy
+#
+#   cp .env.example .env   (fill in your free keys — all optional)
+#   docker compose up -d --build
+#
+# Compose auto-loads .env for the build args below.
+services:
+  verdant:
+    image: verdant:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_CARTO_API_KEY: ${VITE_CARTO_API_KEY:-}
+        VITE_FIRMS_MAP_KEY: ${VITE_FIRMS_MAP_KEY:-}
+        VITE_NVE_API_KEY: ${VITE_NVE_API_KEY:-}
+    container_name: verdant
+    ports:
+      - "8080:8080"
+    restart: unless-stopped

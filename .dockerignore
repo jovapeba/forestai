@@ -1,0 +1,17 @@
+# Keep build context small and never bake local secrets into the image
+node_modules
+dist
+.git
+.gitignore
+.gitattributes
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+.vscode
+.idea
+docker-compose.yml
+Dockerfile
+README.md
+scripts
