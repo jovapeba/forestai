@@ -298,6 +298,33 @@ export const TERRITORIES: Territory[] = [
     ],
     gbifCountry: 'JP',
   },
+  {
+    code: 'CZ',
+    name: 'Czechia',
+    flag: '🇨🇿',
+    capital: 'Prague',
+    coords: { lat: 50.0755, lon: 14.4378 },
+    mapCenter: [49.85, 15.6],
+    zoom: 7,
+    bbox: [12.0, 48.55, 18.9, 51.05],
+    focusLabel: 'Vltava · Labe · Morava — CHMI gauges',
+    focusSites: [
+      { name: 'Krkonoše National Park', lat: 50.72, lon: 15.6 },
+      { name: 'Šumava National Park', lat: 49.13, lon: 13.3 },
+      { name: 'Podyjí National Park', lat: 48.84, lon: 15.77 },
+    ],
+    analysisPoints: { fire: [49.13, 13.3], water: [50.09, 14.42], forest: [49.13, 13.3] },
+    basin: 'Vltava / Labe (Elbe) / Morava',
+    protectedAreas: ['Krkonoše NP', 'Šumava NP', 'Podyjí NP', 'Bohemian Switzerland NP'],
+    species: ['Grey Wolf (Canis lupus)', 'Eurasian Lynx (Lynx lynx)', 'European Wildcat (Felis silvestris)', 'White-tailed Eagle (Haliaeetus albicilla)'],
+    hydroPoints: [
+      { id: 'PRAGUE', name: 'Prague (Vltava)', lat: 50.09, lon: 14.42 },
+      { id: 'OSTRAVA', name: 'Ostrava (Odra)', lat: 49.82, lon: 18.22 },
+      { id: 'BRNO', name: 'Brno (Svratka)', lat: 49.19, lon: 16.59 },
+      { id: 'CEBUD', name: 'České Budějovice (Vltava)', lat: 48.98, lon: 14.46 },
+    ],
+    gbifCountry: 'CZ',
+  },
 ];
 
 export const getTerritory = (code: string): Territory =>

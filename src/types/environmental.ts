@@ -27,6 +27,7 @@ export type FeedSource =
   | 'LIVE:NVE-NORWAY'
   | 'LIVE:HUBEAU'
   | 'LIVE:IMGW-POLAND'
+  | 'LIVE:CHMI-CZECH'
   | 'LIVE:JMA-JAPAN'
   | 'LIVE:JMA-AMEDAS'
   | 'LIVE:CAMS-AQ-GRID'

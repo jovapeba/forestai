@@ -32,6 +32,18 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/hubeau/, ''),
       },
+      // CHMI Czech open data (hydrology gauges) also emits no CORS headers.
+      '/chmi': {
+        target: 'https://opendata.chmi.cz',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/chmi/, ''),
+      },
+      // GDACS global alerts also emit no CORS headers.
+      '/gdacs': {
+        target: 'https://www.gdacs.org',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/gdacs/, ''),
+      },
     },
   },
 });

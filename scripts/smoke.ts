@@ -28,7 +28,7 @@ const check = (name: string, ok: boolean, extra = '') => {
 /* ------------------------- territory configuration ---------------------- */
 
 check('default territory is Slovenia', getTerritory('SI').code === 'SI');
-check('11 view presets (10 countries + global)', TERRITORIES.length === 11);
+check('12 view presets (11 countries + global)', TERRITORIES.length === 12);
 check('global view preset exists', getTerritory('GL').global === true);
 for (const t of TERRITORIES.filter((x) => !x.global)) {
   check(
@@ -179,6 +179,24 @@ for (const code of ['US', 'DE', 'GB', 'SI', 'BR', 'AU', 'PL']) {
   // AMeDAS is Japan-scoped: every other territory is honestly N/A
   const amedasSi = await fetchAmedas(getTerritory('SI'));
   check('AMeDAS not-applicable outside Japan', amedasSi.source === 'NOT-APPLICABLE' && amedasSi.rows.length === 0, amedasSi.source);
+
+  // Czechia — CHMI 10-min gauge series with official four-stage thresholds
+  const czGauges = await fetchRealGauges(getTerritory('CZ'));
+  check(
+    'Czechia CHMI gauges live',
+    czGauges.source === 'LIVE:CHMI-CZECH' &&
+      czGauges.items.length >= 5 &&
+      czGauges.items.every((x) => Number.isFinite(x.level) && x.unit === 'cm' && x.agency === 'CHMI CZECH HYDROMETEOROLOGY'),
+    `${czGauges.source} · ${czGauges.items.length} gauges`,
+  );
+
+  // Czechia MeteoAlarm slug (czechia) reaches the CAP feed
+  const czEvents = await fetchTerritoryEvents(getTerritory('CZ'));
+  check(
+    'Czechia MeteoAlarm CAP live',
+    czEvents.sources.includes('LIVE:METEOALARM'),
+    `${czEvents.items.length} events · ${czEvents.sources.join(',')}`,
+  );
 
   // Global CAMS air-quality city grid — one batched request, real EU AQI
   const aqGrid = await fetchCityAqGrid();

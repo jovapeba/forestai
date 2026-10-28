@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { getTerritory } from '@/data/territoriesData';
 import { fetchFireWeather, fetchHotspots, fetchSoilMoisture, fetchAirQuality } from '@/services/api/openMeteoService';
@@ -68,6 +68,53 @@ export interface LiveFeeds {
   booted: boolean;
 }
 
+/** Declarative feed runner: fetch → know when the result is genuinely DOWN. */
+interface FeedRunner {
+  run: () => Promise<unknown>;
+  apply: (bundle: unknown) => Partial<LiveFeeds>;
+  isDown: (bundle: unknown) => boolean;
+}
+
+const down = (b: { source: FeedSource }): boolean => b.source === 'UNAVAILABLE';
+
+const EMPTY_BUNDLE: EventBundle = { items: [], sources: [] };
+
+const INITIAL: Omit<LiveFeeds, 'viewMode'> = {
+  weather: null,
+  index: null,
+  hotspots: [],
+  hotspotsSource: 'UNAVAILABLE' as FeedSource,
+  hydro: [],
+  hydroSource: 'UNAVAILABLE' as FeedSource,
+  soil: [],
+  soilSource: 'UNAVAILABLE' as FeedSource,
+  air: null,
+  airSource: 'UNAVAILABLE' as FeedSource,
+  occurrences: [],
+  occurrencesSource: 'UNAVAILABLE' as FeedSource,
+  speciesObs: [],
+  realGauges: [],
+  realGaugesSource: 'UNAVAILABLE' as FeedSource,
+  events: EMPTY_BUNDLE,
+  rainRadar: { framePath: null, frameTime: null, source: 'UNAVAILABLE' as FeedSource },
+  usgsGages: [],
+  usgsGagesSource: 'UNAVAILABLE' as FeedSource,
+  fireIncidents: [],
+  fireIncidentsSource: 'NOT-APPLICABLE' as FeedSource,
+  firePerimeters: [],
+  firePerimetersSource: 'NOT-APPLICABLE' as FeedSource,
+  usDrought: [],
+  usDroughtSource: 'NOT-APPLICABLE' as FeedSource,
+  countyAqi: [],
+  countyAqiSource: 'NOT-APPLICABLE' as FeedSource,
+  amedas: [],
+  amedasSource: 'NOT-APPLICABLE' as FeedSource,
+  amedasFrame: null,
+  cityAq: [],
+  cityAqSource: 'UNAVAILABLE' as FeedSource,
+  booted: false,
+};
+
 /**
  * Single orchestration point for all public data feeds. Feeds land
  * PROGRESSIVELY as each request resolves (FIRMS CSV is ~4 MB, weather ~1 KB —
@@ -75,173 +122,204 @@ export interface LiveFeeds {
  * feed is loading the UI shows an explicit loading state, and if a feed fails
  * it shows an explicit UNAVAILABLE state. In the global earth view,
  * point-scoped feeds are labelled NOT-APPLICABLE.
+ *
+ * Reliability: after the first pass, every feed that ended genuinely
+ * UNAVAILABLE (not NOT-APPLICABLE, not a legitimately-empty live window) is
+ * silently re-fetched once after a short delay. Cold CDN edges, brief proxy
+ * hiccups and dev-server restarts would otherwise strand a feed for the
+ * whole session.
  */
 export function useLiveFeeds(): LiveFeeds {
   const territoryCode = useAppStore((s) => s.territoryCode);
   const territory = getTerritory(territoryCode);
   const [feeds, setFeeds] = useState<LiveFeeds>(() => ({
+    ...INITIAL,
     viewMode: 'country' as const,
-    weather: null,
-    index: null,
-    hotspots: [],
-    hotspotsSource: 'UNAVAILABLE' as FeedSource,
-    hydro: [],
-    hydroSource: 'UNAVAILABLE' as FeedSource,
-    soil: [],
-    soilSource: 'UNAVAILABLE' as FeedSource,
-    air: null,
-    airSource: 'UNAVAILABLE' as FeedSource,
-    occurrences: [],
-    occurrencesSource: 'UNAVAILABLE' as FeedSource,
-    speciesObs: [],
-    realGauges: [],
-    realGaugesSource: 'UNAVAILABLE' as FeedSource,
-    events: { items: [], sources: [] },
-    rainRadar: { framePath: null, frameTime: null, source: 'UNAVAILABLE' as FeedSource },
-    usgsGages: [],
-    usgsGagesSource: 'UNAVAILABLE' as FeedSource,
-    fireIncidents: [],
-    fireIncidentsSource: 'NOT-APPLICABLE' as FeedSource,
-    firePerimeters: [],
-    firePerimetersSource: 'NOT-APPLICABLE' as FeedSource,
-    usDrought: [],
-    usDroughtSource: 'NOT-APPLICABLE' as FeedSource,
-    countyAqi: [],
-    countyAqiSource: 'NOT-APPLICABLE' as FeedSource,
-    amedas: [],
-    amedasSource: 'NOT-APPLICABLE' as FeedSource,
-    amedasFrame: null,
-    cityAq: [],
-    cityAqSource: 'UNAVAILABLE' as FeedSource,
-    booted: false,
   }));
+  const feedsRef = useRef<LiveFeeds>(feeds);
+
+  const land = (patch: Partial<LiveFeeds>) => {
+    feedsRef.current = { ...feedsRef.current, ...patch };
+    setFeeds((prev) => ({ ...prev, ...patch }));
+  };
 
   useEffect(() => {
     let cancelled = false;
     const isGlobal = Boolean(territory.global);
-    setFeeds((prev) => ({
-      ...prev,
-      viewMode: isGlobal ? 'global' : 'country',
-      weather: null,
-      index: null,
-      hotspots: [],
-      hotspotsSource: 'UNAVAILABLE',
-      hydro: [],
-      hydroSource: 'UNAVAILABLE',
-      soil: [],
-      soilSource: 'UNAVAILABLE',
-      air: null,
-      airSource: 'UNAVAILABLE',
-      occurrences: [],
-      occurrencesSource: 'UNAVAILABLE',
-      speciesObs: [],
-      realGauges: [],
-      realGaugesSource: 'UNAVAILABLE',
-      events: { items: [], sources: [] },
-      rainRadar: { framePath: null, frameTime: null, source: 'UNAVAILABLE' },
-      usgsGages: [],
-      usgsGagesSource: 'UNAVAILABLE',
-      fireIncidents: [],
-      fireIncidentsSource: 'NOT-APPLICABLE',
-      firePerimeters: [],
-      firePerimetersSource: 'NOT-APPLICABLE',
-      usDrought: [],
-      usDroughtSource: 'NOT-APPLICABLE',
-      countyAqi: [],
-      countyAqiSource: 'NOT-APPLICABLE',
-      amedas: [],
-      amedasSource: 'NOT-APPLICABLE',
-      amedasFrame: null,
-      cityAq: [],
-      cityAqSource: 'UNAVAILABLE',
-      booted: false,
-    }));
+    feedsRef.current = { ...INITIAL, viewMode: isGlobal ? 'global' : 'country' };
+    setFeeds({ ...feedsRef.current });
+
+    const pointRunner: FeedRunner = {
+      // Point-scoped feeds (weather/FWI, soil, air, GloFAS hydrograph) are not
+      // applicable in the global earth view — labelled NOT-APPLICABLE.
+      run: async () => {
+        if (isGlobal) {
+          return {
+            weather: null,
+            index: null,
+            hydro: [],
+            hydroSource: 'NOT-APPLICABLE' as FeedSource,
+            soil: [],
+            soilSource: 'NOT-APPLICABLE' as FeedSource,
+            air: null,
+            airSource: 'NOT-APPLICABLE' as FeedSource,
+            speciesObs: [] as SpeciesObservations[],
+          };
+        }
+        const wx = await fetchFireWeather(territory);
+        const hy = await fetchRiverDischarge(territory).catch(() => ({ points: [], source: 'UNAVAILABLE' as FeedSource }));
+        const soil = await fetchSoilMoisture(territory).catch(() => ({ items: [], source: 'UNAVAILABLE' as FeedSource }));
+        const air = await fetchAirQuality(territory).catch(() => ({ air: null, source: 'UNAVAILABLE' as FeedSource }));
+        let speciesObs: SpeciesObservations[] = [];
+        try {
+          const gbif = await fetchSpeciesObservations(territory);
+          const inat = await fetchInatSpeciesObservations(territory);
+          speciesObs = [...gbif, ...inat];
+        } catch {
+          /* honest empty — the map shows no records rather than fake ones */
+        }
+        return {
+          weather: wx.weather,
+          index: wx.index,
+          hydro: hy.points,
+          hydroSource: hy.source,
+          soil: soil.items,
+          soilSource: soil.source,
+          air: air.air,
+          airSource: air.source,
+          speciesObs,
+        };
+      },
+      apply: (b) => {
+        const r = b as {
+          weather: FireWeather | null;
+          index: FireIndex | null;
+          hydro: HydrographPoint[];
+          hydroSource: FeedSource;
+          soil: SoilPoint[];
+          soilSource: FeedSource;
+          air: AirQuality | null;
+          airSource: FeedSource;
+          speciesObs: SpeciesObservations[];
+        };
+        return {
+          weather: r.weather,
+          index: r.index,
+          hydro: r.hydro,
+          hydroSource: r.hydroSource,
+          soil: r.soil,
+          soilSource: r.soilSource,
+          air: r.air,
+          airSource: r.airSource,
+          speciesObs: r.speciesObs,
+        };
+      },
+      isDown: (b) => {
+        const r = b as { hydroSource?: FeedSource; soilSource?: FeedSource; airSource?: FeedSource } | null;
+        return !!r && !isGlobal && r.hydroSource === 'UNAVAILABLE' && r.soilSource === 'UNAVAILABLE' && r.airSource === 'UNAVAILABLE';
+      },
+    };
+
+    const runners: FeedRunner[] = [
+      pointRunner,
+      {
+        run: () => fetchHotspots(territory),
+        apply: (b) => ({ hotspots: (b as { items: FireHotspot[] }).items, hotspotsSource: (b as { source: FeedSource }).source }),
+        isDown: (b) => down(b as { source: FeedSource }),
+      },
+      {
+        run: () => fetchOccurrences(territory),
+        apply: (b) => ({ occurrences: (b as { items: Occurrence[] }).items, occurrencesSource: (b as { source: FeedSource }).source }),
+        isDown: (b) => down(b as { source: FeedSource }),
+      },
+      {
+        run: () => fetchRealGauges(territory),
+        apply: (b) => ({ realGauges: (b as { items: RealGauge[] }).items, realGaugesSource: (b as { source: FeedSource }).source }),
+        isDown: (b) => down(b as { source: FeedSource }),
+      },
+      {
+        run: () => fetchTerritoryEvents(territory),
+        apply: (b) => ({ events: b as EventBundle }),
+        isDown: (b) => (b as EventBundle).sources.length === 0,
+      },
+      {
+        run: () => fetchRainRadar(),
+        apply: (b) => ({ rainRadar: b as RainRadar }),
+        isDown: (b) => down(b as { source: FeedSource }),
+      },
+      {
+        run: () => fetchUsgsDailyGages(territory),
+        apply: (b) => ({ usgsGages: (b as { items: UsgsDailyGage[] }).items, usgsGagesSource: (b as { source: FeedSource }).source }),
+        isDown: (b) => down(b as { source: FeedSource }),
+      },
+      {
+        run: () => fetchFireIncidents(territory),
+        apply: (b) => ({ fireIncidents: (b as { items: FireIncident[] }).items, fireIncidentsSource: (b as { source: FeedSource }).source }),
+        isDown: (b) => down(b as { source: FeedSource }),
+      },
+      {
+        run: () => fetchFirePerimeters(territory),
+        apply: (b) => ({ firePerimeters: (b as { items: FirePerimeter[] }).items, firePerimetersSource: (b as { source: FeedSource }).source }),
+        isDown: (b) => down(b as { source: FeedSource }),
+      },
+      {
+        run: () => fetchUsDrought(territory),
+        apply: (b) => ({ usDrought: (b as { items: UsIndexPoint[] }).items, usDroughtSource: (b as { source: FeedSource }).source }),
+        isDown: (b) => down(b as { source: FeedSource }),
+      },
+      {
+        run: () => fetchCountyAqi(territory),
+        apply: (b) => ({ countyAqi: (b as { items: UsIndexPoint[] }).items, countyAqiSource: (b as { source: FeedSource }).source }),
+        isDown: (b) => down(b as { source: FeedSource }),
+      },
+      {
+        run: () => fetchAmedas(territory),
+        apply: (b) => ({
+          amedas: (b as { rows: AmedasRow[] }).rows,
+          amedasSource: (b as { source: FeedSource }).source,
+          amedasFrame: (b as { frameTime: string | null }).frameTime,
+        }),
+        isDown: (b) => down(b as { source: FeedSource }),
+      },
+      {
+        run: () => fetchCityAqGrid(),
+        apply: (b) => ({ cityAq: (b as { rows: CityAqRow[] }).rows, cityAqSource: (b as { source: FeedSource }).source }),
+        isDown: (b) => down(b as { source: FeedSource }),
+      },
+    ];
+
+    /** Latest bundle per runner — updated as each fetch lands. */
+    const lastBundles = new Map<FeedRunner, unknown>();
+
+    const runFeed = async (r: FeedRunner): Promise<void> => {
+      const bundle = await r.run();
+      if (cancelled) return;
+      lastBundles.set(r, bundle);
+      land(r.apply(bundle));
+    };
+
+    const runPass = async (): Promise<void> => {
+      await Promise.allSettled(runners.map((r) => runFeed(r)));
+    };
 
     (async () => {
-      const land = (patch: Partial<LiveFeeds>) => {
-        if (!cancelled) setFeeds((prev) => ({ ...prev, ...patch }));
-      };
-
-      // Point-scoped feeds (weather/FWI, soil, air, GloFAS hydrograph) are not
-      // applicable in the global earth view — labelled NOT-APPLICABLE, never faked.
-      const pointFeeds = isGlobal
-        ? [
-            Promise.resolve(
-              land({
-                weather: null,
-                index: null,
-                hydro: [],
-                hydroSource: 'NOT-APPLICABLE',
-                soil: [],
-                soilSource: 'NOT-APPLICABLE',
-                air: null,
-                airSource: 'NOT-APPLICABLE',
-                speciesObs: [],
-              }),
-            ),
-          ]
-        : [
-            fetchFireWeather(territory)
-              .then((b) => land({ weather: b.weather, index: b.index }))
-              .catch(() => land({ weather: null, index: null })),
-            fetchRiverDischarge(territory)
-              .then((b) => land({ hydro: b.points, hydroSource: b.source }))
-              .catch(() => land({ hydro: [], hydroSource: 'UNAVAILABLE' })),
-            fetchSoilMoisture(territory)
-              .then((b) => land({ soil: b.items, soilSource: b.source }))
-              .catch(() => land({ soil: [], soilSource: 'UNAVAILABLE' })),
-            fetchAirQuality(territory)
-              .then((b) => land({ air: b.air, airSource: b.source }))
-              .catch(() => land({ air: null, airSource: 'UNAVAILABLE' })),
-            (async () => {
-              const gbifBundle = await fetchSpeciesObservations(territory);
-              const inatBundle = await fetchInatSpeciesObservations(territory);
-              land({ speciesObs: [...gbifBundle, ...inatBundle] });
-            })().catch(() => land({ speciesObs: [] })),
-          ];
-
-      // Both modes: fires, GBIF window, real gauges (all networks in global), events
-      const worldwideFeeds = [
-        fetchHotspots(territory)
-          .then((b) => land({ hotspots: b.items, hotspotsSource: b.source }))
-          .catch(() => land({ hotspots: [], hotspotsSource: 'UNAVAILABLE' })),
-        fetchOccurrences(territory)
-          .then((b) => land({ occurrences: b.items, occurrencesSource: b.source }))
-          .catch(() => land({ occurrences: [], occurrencesSource: 'UNAVAILABLE' })),
-        fetchRealGauges(territory)
-          .then((b) => land({ realGauges: b.items, realGaugesSource: b.source }))
-          .catch(() => land({ realGauges: [], realGaugesSource: 'UNAVAILABLE' })),
-        fetchTerritoryEvents(territory)
-          .then((b) => land({ events: b }))
-          .catch(() => land({ events: { items: [], sources: [] } })),
-        fetchRainRadar()
-          .then((r) => land({ rainRadar: r }))
-          .catch(() => land({ rainRadar: { framePath: null, frameTime: null, source: 'UNAVAILABLE' } })),
-        fetchUsgsDailyGages(territory)
-          .then((g) => land({ usgsGages: g.items, usgsGagesSource: g.source }))
-          .catch(() => land({ usgsGages: [], usgsGagesSource: 'UNAVAILABLE' })),
-        fetchFireIncidents(territory)
-          .then((b) => land({ fireIncidents: b.items, fireIncidentsSource: b.source }))
-          .catch(() => land({ fireIncidents: [], fireIncidentsSource: 'UNAVAILABLE' })),
-        fetchFirePerimeters(territory)
-          .then((b) => land({ firePerimeters: b.items, firePerimetersSource: b.source }))
-          .catch(() => land({ firePerimeters: [], firePerimetersSource: 'UNAVAILABLE' })),
-        fetchUsDrought(territory)
-          .then((b) => land({ usDrought: b.items, usDroughtSource: b.source }))
-          .catch(() => land({ usDrought: [], usDroughtSource: 'UNAVAILABLE' })),
-        fetchCountyAqi(territory)
-          .then((b) => land({ countyAqi: b.items, countyAqiSource: b.source }))
-          .catch(() => land({ countyAqi: [], countyAqiSource: 'UNAVAILABLE' })),
-        fetchAmedas(territory)
-          .then((b) => land({ amedas: b.rows, amedasSource: b.source, amedasFrame: b.frameTime }))
-          .catch(() => land({ amedas: [], amedasSource: 'UNAVAILABLE', amedasFrame: null })),
-        fetchCityAqGrid()
-          .then((b) => land({ cityAq: b.rows, cityAqSource: b.source }))
-          .catch(() => land({ cityAq: [], cityAqSource: 'UNAVAILABLE' })),
-      ];
-
-      await Promise.allSettled([...pointFeeds, ...worldwideFeeds]);
+      await runPass();
       land({ booted: true });
+      // Up to two quiet retry passes for feeds that ended genuinely
+      // UNAVAILABLE — NOT-APPLICABLE and legitimately-empty LIVE states are
+      // left alone. Cold CDN edges, brief proxy hiccups and dev-server
+      // restarts would otherwise strand a feed for the whole session.
+      for (const delayMs of [4000, 9000]) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        if (cancelled) return;
+        const retriable = runners.filter((r) => {
+          const bundle = lastBundles.get(r);
+          return bundle != null && r.isDown(bundle);
+        });
+        if (retriable.length === 0) return;
+        await Promise.allSettled(retriable.map((r) => runFeed(r)));
+        land({ booted: true });
+      }
     })();
 
     return () => {

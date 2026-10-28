@@ -100,6 +100,7 @@ const METEOALARM_SLUGS: Record<string, string> = {
   SI: 'slovenia', DE: 'germany', GB: 'united-kingdom', FR: 'france',
   PL: 'poland', NL: 'netherlands', NO: 'norway', IT: 'italy',
   ES: 'spain', SE: 'sweden', FI: 'finland', AT: 'austria',
+  CZ: 'czechia',
 };
 
 async function fetchMeteoAlarm(territory: Territory): Promise<EnvironmentalEvent[]> {
@@ -211,9 +212,13 @@ async function fetchGdacs(): Promise<EnvironmentalEvent[]> {
   const types = ['TC', 'EQ', 'WF', 'VO'] as const;
   const settled = await Promise.allSettled(
     types.map((t) =>
-      fetchWithTimeout(`https://www.gdacs.org/gdacsapi/api/events/geteventlist/MAP?eventtype=${t}`, 15000).then(
-        (r) => r.json() as Promise<{ features?: Record<string, unknown>[] }>,
-      ),
+      fetchFirstReachable(
+        [
+          `/gdacs/gdacsapi/api/events/geteventlist/MAP?eventtype=${t}`,
+          `https://www.gdacs.org/gdacsapi/api/events/geteventlist/MAP?eventtype=${t}`,
+        ],
+        15000,
+      ).then((r) => r.json() as Promise<{ features?: Record<string, unknown>[] }>),
     ),
   );
   const events: EnvironmentalEvent[] = [];

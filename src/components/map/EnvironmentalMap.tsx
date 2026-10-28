@@ -168,7 +168,7 @@ export function EnvironmentalMap() {
           center={territory.mapCenter}
           zoom={territory.zoom}
           minZoom={3}
-          maxZoom={12}
+          maxZoom={19}
           scrollWheelZoom={false}
           className="h-full w-full"
           worldCopyJump
@@ -205,13 +205,25 @@ export function EnvironmentalMap() {
             />
           )}
 
+          {/* Esri World Imagery — real high-resolution satellite (up to ~0.3 m/px
+              in cities; free access with attribution for non-commercial use) */}
+          {layers.esri && (
+            <TileLayer
+              key="esri-imagery"
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              attribution='Imagery &copy; <a href="https://www.esri.com/">Esri</a>, Maxar, Earthstar Geographics &amp; the GIS User Community'
+              maxNativeZoom={19}
+              maxZoom={19}
+            />
+          )}
+
           {/* Sentinel-2 cloudless 10 m mosaic (EOX — real imagery, free tier) */}
           {layers.s2 && (
             <TileLayer
-              url="https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg"
-              attribution='Imagery © <a href="https://s2maps.eu/">Sentinel-2 cloudless (EOX IT Services)</a>'
+              url="https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/{z}/{y}/{x}.jpg"
+              attribution='Imagery &copy; <a href="https://s2maps.eu/">Sentinel-2 cloudless 2024 (EOX IT Services)</a>'
               maxNativeZoom={14}
-              maxZoom={12}
+              maxZoom={15}
             />
           )}
 
@@ -337,7 +349,7 @@ export function EnvironmentalMap() {
               .flatMap((so) =>
               so.items.map((o, i) => (
                 <CircleMarker
-                  key={`${so.dataset}-${so.species}-${o.lat}-${o.lon}`}
+                  key={`${so.dataset}-${so.species}-${o.lat}-${o.lon}-${i}`}
                   center={[o.lat, o.lon]}
                   radius={4}
                   pathOptions={
@@ -653,6 +665,7 @@ export function EnvironmentalMap() {
         <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-sky-400" /> JMA AMeDAS stations (real)</span>
         <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-lime-400" /> CAMS air grid (real)</span>
         <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-violet-300/70" /> VIIRS aerosols (real)</span>
+        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-slate-200" /> Esri high-res imagery (real)</span>
       </div>
 
       {/* HUD corner ticks */}

@@ -19,6 +19,7 @@ export interface MapLayers {
   amedas: boolean;
   aqgrid: boolean;
   aod: boolean;
+  esri: boolean;
   s2: boolean;
   terrain: boolean;
 }
@@ -42,9 +43,12 @@ export const useAppStore = create<AppState>((set) => ({
   pilotOpen: false,
   satelliteOpacity: 0.85,
   layers: {
-    satellite: true, ndvi: false, fire: true, water: true, official: true, animal: true,
-    forest: true, events: true, rain: true, incidents: true, perimeters: true,
-    drought: true, aqi: true, amedas: true, aqgrid: true, aod: true, s2: false, terrain: false,
+    // Default layers ON: real points/data. Heavy raster imagery (GIBS true
+    // color, VIIRS aerosols) and the rain radar start OFF — the map loads
+    // fast and clean; users opt into imagery per view.
+    satellite: false, ndvi: false, fire: true, water: true, official: true, animal: true,
+    forest: true, events: true, rain: false, incidents: true, perimeters: true,
+    drought: true, aqi: true, amedas: true, aqgrid: true, aod: false, esri: true, s2: false, terrain: false,
   },
   setTerritory: (code) => set({ territoryCode: code }),
   setLang: (lang) => set({ lang }),

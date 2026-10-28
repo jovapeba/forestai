@@ -450,6 +450,80 @@ async function fetchImgwGauges(territory: Territory): Promise<RealGauge[]> {
   return gauges;
 }
 
+/* ------------------------ 🇨🇿 CHMI (Czechia) ---------------------------- */
+
+/**
+ * CHMI (Czech Hydrometeorological Institute) Open Data — 563 hydrometric
+ * stations, anonymous JSON directory, no key. Per-station files carry a
+ * 10-minute water-stage series (tsConID H, cm) and the metadata carries the
+ * official four danger stages (SPA1H–SPA4H) per station.
+ */
+const CHMI_STATIONS: Record<
+  string,
+  { id: string; name: string; river: string; lat: number; lon: number; stages: (number | null)[] }[]
+> = {
+  CZ: [
+    { id: '0-203-1-200900', name: 'Praha - Na Františku', river: 'Vltava', lat: 50.0932, lon: 14.4234, stages: [null, null, null, 606] },
+    { id: '0-203-1-221000', name: 'Ústí nad Labem', river: 'Labe', lat: 50.6539, lon: 14.0425, stages: [450, 530, 600, 1062] },
+    { id: '0-203-1-104400', name: 'Kostelec nad Labem', river: 'Labe', lat: 50.2378, lon: 14.5926, stages: [520, 620, 680, 788] },
+    { id: '0-203-1-294000', name: 'Bohumín', river: 'Odra', lat: 49.9212, lon: 18.3281, stages: [400, 500, 600, 686] },
+    { id: '0-203-1-257000', name: 'Svinov (Ostrava)', river: 'Odra', lat: 49.8198, lon: 18.217, stages: [310, 460, 520, 669] },
+    { id: '0-203-1-367000', name: 'Olomouc-Nové Sady', river: 'Morava', lat: 49.5773, lon: 17.2609, stages: [360, 390, 430, 534] },
+    { id: '0-203-1-198000', name: 'Beroun', river: 'Berounka', lat: 49.9587, lon: 14.0877, stages: [260, 320, 400, 650] },
+    { id: '0-203-1-115100', name: 'České Budějovice', river: 'Vltava', lat: 48.9814, lon: 14.4624, stages: [300, 370, 430, 530] },
+  ],
+  ALL: [],
+};
+
+async function fetchChmiGauges(territory: Territory): Promise<RealGauge[]> {
+  const stations = CHMI_STATIONS[territory.code];
+  if (!stations) return [];
+  const gauges = await Promise.all(
+    stations.map(async (st): Promise<RealGauge | null> => {
+      try {
+        const res = await fetchFirstReachable(
+          [
+            `/chmi/hydrology/now/data/${st.id}.json`,
+            `https://opendata.chmi.cz/hydrology/now/data/${st.id}.json`,
+          ],
+          8000,
+        );
+        const j = await res.json();
+        const ts = (j?.objList?.[0]?.tsList ?? []).find(
+          (t: Record<string, unknown>) => t.tsConID === 'H',
+        );
+        const rows = (ts?.tsData ?? []) as { dt?: string; value?: number }[];
+        const series = rows.map((r) => num(r.value, Number.NaN)).filter((v: number) => Number.isFinite(v));
+        if (series.length === 0) return null;
+        const last = series[series.length - 1];
+        const [s1, , s3] = st.stages;
+        const status: StationStatus =
+          s3 != null && last >= s3 ? 'ALERT' : s1 != null && last >= s1 ? 'ELEVATED' : 'NOMINAL';
+        const { trend, span } = trendOf(series, 1);
+        return {
+          id: st.id,
+          name: st.name,
+          river: `River ${st.river}`,
+          lat: st.lat,
+          lon: st.lon,
+          level: Number(last.toFixed(0)),
+          unit: 'cm' as const,
+          state: status === 'ALERT' ? 'high' : status === 'ELEVATED' ? 'elevated' : 'normal',
+          timestamp: String(rows[rows.length - 1]?.dt ?? new Date().toISOString()),
+          agency: 'CHMI CZECH HYDROMETEOROLOGY',
+          source: 'LIVE:CHMI-CZECH' as FeedSource,
+          status,
+          trend,
+          trendSpan: Number(span.toFixed(0)),
+        };
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return gauges.filter((g): g is RealGauge => g !== null);
+}
+
 /* ----------------------------- aggregator ------------------------------ */
 
 export async function fetchRealGauges(
@@ -466,6 +540,7 @@ export async function fetchRealGauges(
     fetchNveGauges(pseudo),
     fetchHubeauGauges(pseudo),
     fetchImgwGauges(pseudo),
+    fetchChmiGauges(pseudo),
   ]);
   const items = settled.flatMap((s) => (s.status === 'fulfilled' ? s.value : []));
   if (items.length > 0) {

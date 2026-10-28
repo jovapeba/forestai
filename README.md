@@ -41,12 +41,12 @@ npx tsx scripts/smoke.ts   # real-feed smoke test (live-or-unavailable assertion
 | IGNIS · weather | **Open-Meteo** current weather (global, no key) | `LIVE:OPEN-METEO` or `UNAVAILABLE` |
 | IGNIS · FWI | Transparent Nesterov-style derivation from the live weather | `DERIVED:OPEN-METEO` |
 | FLUVIA · global | **Copernicus GloFAS** modelled discharge via `flood-api.open-meteo.com` (7-day ensemble + climatological mean) | `LIVE:GLOFAS` — always labelled *model output, not an observed gauge* |
-| FLUVIA · official gauges | 🇺🇸 **USGS NWIS IV** (`waterservices.usgs.gov`, param 00065) · 🇩🇪 **WSV Pegelonline v2** (`pegelonline.wsv.de`) · 🇬🇧 **UK Environment Agency** (`environment.data.gov.uk`) · 🇫🇷 **Hub'Eau hydrometrie** (`hubeau.eaufrance.fr`, anonymous/CORS-open; some datacenter egress gets 403) · 🇵🇱 **IMGW hydro** (`danepubliczne.imgw.pl`, ~913 stations, CORS-open, real per-station alarm/warning thresholds) · 🇳🇴 **NVE HydAPI** (`hydapi.nve.no`, free key — `VITE_NVE_API_KEY`) — all verified live | per-gauge `LIVE:*` · territories with no anonymous open network (🇸🇮 ARSO, 🇧🇷 ANA Hidroweb, 🇦🇺 BoM) show `UNAVAILABLE` — no readings are invented |
+| FLUVIA · official gauges | 🇺🇸 **USGS NWIS IV** (`waterservices.usgs.gov`, param 00065) · 🇩🇪 **WSV Pegelonline v2** (`pegelonline.wsv.de`) · 🇬🇧 **UK Environment Agency** (`environment.data.gov.uk`) · 🇫🇷 **Hub'Eau hydrometrie** (`hubeau.eaufrance.fr`, anonymous/CORS-open; some datacenter egress gets 403) · 🇵🇱 **IMGW hydro** (`danepubliczne.imgw.pl`, ~913 stations, CORS-open, real per-station alarm/warning thresholds) · 🇨🇿 **CHMI Open Data** (`opendata.chmi.cz`, 563 stations, 10-min series + official 4-stage danger thresholds) · 🇳🇴 **NVE HydAPI** (`hydapi.nve.no`, free key — `VITE_NVE_API_KEY`) — all verified live | per-gauge `LIVE:*` · territories with no anonymous open network (🇸🇮 ARSO, 🇧🇷 ANA Hidroweb, 🇦🇺 BoM) show `UNAVAILABLE` — no readings are invented |
 | FAUNA | **GBIF** species-match + occurrence search (global backbone) · **iNaturalist** recent georeferenced observations (`api.inaturalist.org`) — both scoped to the territory bbox | `LIVE:GBIF` / `LIVE:INATURALIST` or `UNAVAILABLE` · **no collar telemetry is simulated** |
 | ORBITA | **NASA GIBS** `MODIS_Terra_CorrectedReflectance_TrueColor` WMTS (real daily imagery) | always live imagery |
 | CANOPY | **Open-Meteo** ERA5/CMAAS 4-layer soil moisture (0–1 / 1–3 / 3–9 / 9–27 cm) · **CAMS air quality** — EU AQI + PM2.5/PM10/O₃/NO₂/SO₂/CO (global, no key) · **CAMS city grid** — real EU-AQI/PM at 33 world cities from one batched request (map layer, all views) | `LIVE:OPEN-METEO` / `LIVE:CAMS-AQ-GRID` or `UNAVAILABLE` |
 | Map · satellite AQ | **NASA GIBS VIIRS SNPP Deep Blue AOD** — daily aerosol optical depth (smoke · dust · haze column), global, no key | tile layer, verified live incl. same-day tiles |
-| SENTRY | Incidents derived **only from real live data** — FIRMS detections, GloFAS exceedance, gauge trends · **USGS earthquake FDSN** (`earthquake.usgs.gov`, global, no key) · **NASA EONET** open natural events (`eonet.gsfc.nasa.gov`, global) · **GDACS** EU/JRC global alerts — cyclones · EQ · wildfires · volcanoes, incl. Africa/Asia (`www.gdacs.org/gdacsapi`, no key; flood-type endpoint is 404 upstream) · **MeteoAlarm CAP** official warnings for ~37 European countries (`feeds.meteoalarm.org`, no key; dev-proxied via `/meteoalarm`) · **NOAA NWS active alerts** (US severe thunderstorm / tornado / flood warnings, no key) · **JMA Japan warnings** (`www.jma.go.jp/bosai`, official text-only — no geometry, so they surface in the SENTRY list, never plotted) | `no active incidents` when nothing qualifies — never a placeholder scenario · events without coordinates are listed, not fabricated onto the map |
+| SENTRY | Incidents derived **only from real live data** — FIRMS detections, GloFAS exceedance, gauge trends · **USGS earthquake FDSN** (`earthquake.usgs.gov`, global, no key) · **NASA EONET** open natural events (`eonet.gsfc.nasa.gov`, global) · **GDACS** EU/JRC global alerts — cyclones · EQ · wildfires · volcanoes, incl. Africa/Asia (`www.gdacs.org/gdacsapi`, no key; flood-type endpoint is 404 upstream) · **MeteoAlarm CAP** official warnings for ~37 European countries incl. Czechia (`feeds.meteoalarm.org`, no key; proxy-first fetch) · **NOAA NWS active alerts** (US severe thunderstorm / tornado / flood warnings, no key) · **JMA Japan warnings** (`www.jma.go.jp/bosai`, official text-only — no geometry, so they surface in the SENTRY list, never plotted) | `no active incidents` when nothing qualifies — never a placeholder scenario · events without coordinates are listed, not fabricated onto the map |
 | Map · rain radar | **RainViewer** public radar mosaic — global precipitation/thunderstorm cells, ~10-min refresh, no key (toggle `RAIN RADAR`) | `LIVE:RAINVIEWER` or `UNAVAILABLE` |
 | Map · thunderstorm | WMO weather code 95–99 from the live Open-Meteo reading → ⚡ badge in IGNIS · radar cells on the map · official CAP/NWS warnings · **Open-Meteo `lightning_potential`** (J/kg, CAMS 15-min slots) → explicit lightning badge when > 0 | derived from live feeds |
 | Map · US fire incidents | **NIFC/WFIGS** current wildland fire incidents (name, acres, % contained, cause) via `wildfiredata.dev` — hourly, public domain | `LIVE:US-FIRE-INCIDENTS` |
@@ -54,7 +54,7 @@ npx tsx scripts/smoke.ts   # real-feed smoke test (live-or-unavailable assertion
 | Map · drought | **US Drought Monitor** (weekly) — D0–D4 share of county area via `waterdata.dev drought-county` | `LIVE:US-DROUGHT-MONITOR` |
 | Map · air quality | **US EPA** daily county AQI with category + defining pollutant via `airdata.dev` | `LIVE:EPA-AQI` |
 | Map · JMA AMeDAS | **JMA AMeDAS** nationwide 10-min observation frame — all 1,286 Japanese stations with temp / rain 10m·1h·24h / wind / humidity and per-value quality flags (`www.jma.go.jp/bosai`, one request per frame, CORS-open, no key) | `LIVE:JMA-AMEDAS` (Japan view) · `NOT-APPLICABLE` in the global view and all other territories |
-| Map · imagery/terrain | **Sentinel-2 cloudless 10 m** mosaic (EOX, free) · **OpenTopoMap** contour overlay (free) | tile layers with attribution |
+| Map · imagery/terrain | **Sentinel-2 cloudless 10 m** 2024 mosaic (EOX, free) · **Esri World Imagery** — real high-res satellite to ~0.3 m/px in cities (zoom 19; free access with attribution for non-commercial apps) · **OpenTopoMap** contour overlay (free) | tile layers with attribution · imagery toggles default OFF |
 
 ### Free API catalog — verified October 2026
 
@@ -81,6 +81,32 @@ for collar telemetry — the only legitimate source for animal tracks).
 KR WAMIS (unreachable from public egress). SMHI metobs *data* is open keyless (verified) — only its
 national hydrology (stage) lives elsewhere; Sweden still has no integrated stage network.
 
+### Country sweep — Europe & Asia (probed October 2026)
+
+**National open feeds verified live this round:** 🇨🇿 CHMI hydro (563 gauges, integrated) ·
+🇱🇹 meteo.lt (station obs + forecasts, open, no key) · 🇮🇩 BMKG earthquakes (felt reports,
+open) · 🇭🇰 HKO open data (CORS-open).
+
+**Anonymous-national-source exists but integration pending (open, verified):** 🇸🇪 SMHI metobs
+(weather obs), 🇱🇹 meteo.lt obs, 🇮🇩 BMKG, 🇭🇰 HKO — small national scope vs. the global feeds
+already covering them; add on demand.
+
+**Probed with no anonymous national API (404 / SPA shell / HTML-only / egress-blocked):**
+🇦🇹 GeoSphere datahub, 🇧🇪 waterinfo, 🇧🇬 NIMH, 🇭🇷 DHMZ, 🇨🇾, 🇩🇰 DMI (key), 🇪🇪 ilmateenistus
+(legacy 000), 🇬🇷 OGA/YPEKA, 🇭🇺 vizugy, 🇮🇪 Met Éireann/EPA hydronet, 🇮🇹 regional SAIH APIs,
+🇱🇻 LVĢMC, 🇱🇺, 🇲🇪 IHMS, 🇲🇰, 🇲🇹, 🇵🇹 SNIRH, 🇷🇴 INHGA, 🇷🇸 RHMZ, 🇷🇺 Roshydromet, 🇸🇰 SHMÚ,
+🇪🇸 basin SAIHs, 🇹🇷 AFAD/MGM (SPA), 🇺🇦 UHMI, 🇱🇮, 🇦🇲, 🇦🇿, 🇰🇿, 🇰🇬, 🇹🇯, 🇹🇲, 🇲🇳, 🇲🇻, 🇧🇹,
+🇦🇫, 🇸🇦, 🇦🇪, 🇴🇲, 🇱🇧, 🇯🇴, 🇹🇼 CWA (key), 🇰🇷 KMA (key), 🇸🇬 NEA (key), 🇮🇳 WRIS (key),
+🇵🇭 PAGASA, 🇹🇭 RID, 🇻🇳, 🇲🇾, 🇳🇵, 🇮🇱 IMS (key).
+
+**Reality check:** a dedicated anonymous national feed does NOT exist for every country —
+closed systems dominate the Balkans, Central Asia, the Gulf, and much of South/Southeast Asia.
+However, **every country on Earth is covered by the platform's global feeds**: NASA FIRMS
+fire detections · USGS earthquakes · NASA EONET · GDACS alerts · RainViewer radar ·
+Open-Meteo CAMS weather/soil/AQ (incl. the 33-city air grid) · NASA GIBS imagery+AOD ·
+GBIF species records (per-country country-scoped query). Registration-free, verified,
+coordinate-true — the honest baseline is planet-wide even where no national API exists.
+
 **No usable file feed (probed):** wildfiredata.dev `smoke` (NOAA HMS) publishes metadata but no
 files; direct NOAA HMS endpoints (satepsanone/ospo) answer 403 to server fetches — smoke plumes stay
 `UNAVAILABLE` until an accessible mirror exists. GDACS flood-type event list returns 404 upstream.
@@ -89,7 +115,10 @@ anonymous API (portal offers a manual data-request form instead). CH hydrodaten 
 hydrodata / BE waterinfo / FI SYKE serve HTML or SPA bundles without a documented anonymous JSON API.
 
 Note: MeteoAlarm emits no CORS headers — in production host the `/meteoalarm` proxy on your server
-(same for the FIRMS CSV unless the MAP_KEY path is used).
+(same for the FIRMS CSV unless the MAP_KEY path is used). The bundled nginx image handles all four
+(`/firms-csv`, `/meteoalarm`, `/hubeau`, `/chmi`, `/gdacs`). The feed orchestrator additionally
+re-tries any feed that ended genuinely `UNAVAILABLE` twice (at +4 s and +13 s) before giving up,
+so a cold CDN edge or a brief proxy hiccup doesn't strand a feed for the session.
 
 ### Docker deploy (bundled)
 
